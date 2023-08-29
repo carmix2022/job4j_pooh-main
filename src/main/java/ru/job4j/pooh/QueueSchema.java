@@ -3,13 +3,14 @@ package ru.job4j.pooh;
 import java.util.concurrent.*;
 
 public class QueueSchema implements Schema {
-    private final CopyOnWriteArrayList<Receiver> receivers = new CopyOnWriteArrayList<>();
+    private final ConcurrentHashMap<String, CopyOnWriteArrayList<Receiver>> receivers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, BlockingQueue<String>> data = new ConcurrentHashMap<>();
     private final Condition condition = new Condition();
 
     @Override
     public void addReceiver(Receiver receiver) {
-        receivers.add(receiver);
+        receivers.putIfAbsent(receiver.name(), new CopyOnWriteArrayList<>());
+        receivers.get(receiver.name()).add(receiver);
         condition.on();
     }
 
@@ -23,19 +24,20 @@ public class QueueSchema implements Schema {
     @Override
     public void run() {
         while (!Thread.currentThread().isInterrupted()) {
-            do {
-                for (var receiver : receivers) {
-                    var queue = data.get(receiver.name());
-                    var message = queue.poll();
-                    while (message != null) {
-                        receiver.receive(
-                                message
-                        );
-                        message = queue.poll();
+            for (String topic : data.keySet()) {
+                var textQueue = data.get(topic);
+                var topicReceivers = receivers.get(topic);
+                if (textQueue == null || topicReceivers == null) {
+                    continue;
+                }
+                while (!textQueue.isEmpty()) {
+                    for (Receiver receiver : topicReceivers) {
+                        if (!textQueue.isEmpty()) {
+                            receiver.receive(textQueue.poll());
+                        }
                     }
                 }
-                condition.off();
-            } while (condition.check());
+            }
             try {
                 condition.await();
             } catch (InterruptedException e) {
