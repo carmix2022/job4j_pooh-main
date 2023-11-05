@@ -28,21 +28,21 @@ public class TopicSchema implements Schema {
     @Override
     public void run() {
         while (!Thread.currentThread().isInterrupted()) {
-            do {
-                for (String topic : data.keySet()) {
-                    var textQueue = data.get(topic);
-                    var topicReceivers = receivers.get(topic);
-                    if (topicReceivers != null) {
-                        String message = textQueue.poll();
-                        while (message != null) {
-                            String finalMessage = message;
-                            topicReceivers.forEach(x -> x.receive(finalMessage));
-                            message = textQueue.poll();
-                        }
+         //   do {
+            for (String topic : data.keySet()) {
+                var textQueue = data.get(topic);
+                var topicReceivers = receivers.get(topic);
+                if (topicReceivers != null) {
+                    String message = textQueue.poll();
+                    while (message != null) {
+                        String finalMessage = message;
+                        topicReceivers.forEach(x -> x.receive(finalMessage));
+                        message = textQueue.poll();
                     }
                 }
-                condition.off();
-            } while (condition.check());
+            }
+            condition.off();
+           // } while (condition.check());
             try {
                 condition.await();
             } catch (InterruptedException e) {
